@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Игрушечное Такси - Водитель</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #111827;
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        /* Статус-панель таксиста */
+        .status-panel {
+            width: 100%;
+            max-width: 400px;
+            background: #fff;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .status-title {
+            font-size: 14px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-value {
+            font-size: 22px;
+            font-weight: bold;
+            color: #059669; /* Зеленый цвет активности */
+            margin: 5px 0 15px 0;
+        }
+
+        .btn {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+        .btn:active { background-color: #1d4ed8; }
+        .btn:disabled { background-color: #d1d5db; color: #9ca3af; }
+
+        /* Карта квартиры */
+        .map-container {
+            width: 100%;
+            max-width: 400px;
+            background: #e5e7eb;
+            border-radius: 16px;
+            padding: 10px;
+            box-sizing: border-box;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-gap: 10px;
+            height: 320px;
+            position: relative;
+        }
+
+        .room {
+            background: white;
+            border: 2px solid #9ca3af;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #4b5563;
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .room:active { background: #eff6ff; border-color: #3b82f6; }
+
+        /* Иконка машинки такси */
+        .taxi-marker {
+            width: 40px;
+            height: 40px;
+            background-color: #f59e0b; /* Желтый такси */
+            border: 3px solid #111827;
+            border-radius: 50%;
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            pointer-events: none; /* Чтобы не мешать кликам по комнатам */
+            transition: all 0.4s ease-in-out; /* Плавное скольжение машинки */
+            z-index: 10;
+        }
+
+        /* Особая разметка для коридора во всю длину */
+        .corridor {
+            grid-column: span 2;
+            height: 60px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🚕 Таксометр Водителя</h1>
+
+    <div class="status-panel">
+        <div class="status-title">Текущий статус</div>
+        <div id="statusText" class="status-value">Свободен. Ожидание...</div>
+        <button id="actionBtn" class="btn" onclick="nextStep()" disabled>Нет заказов</button>
+    </div>
+
+    <div class="map-container" id="map">
+        
+        <div class="room" id="kitchen" onclick="moveTaxi('kitchen')">Кухня</div>
+        <div class="room" id="bedroom" onclick="moveTaxi('bedroom')">Спальня</div>
+        <div class="room corridor" id="hallway" onclick="moveTaxi('hallway')">Коридор</div>
+        <div class="room" id="livingroom" onclick="moveTaxi('livingroom')">Зал</div>
+        <div class="room" id="bathroom" onclick="moveTaxi('bathroom')">Ванная</div>
+
+        <div id="taxi" class="taxi-marker">🚖</div>
+    </div>
+
+    <script>
+        // Координаты комнат для центрирования машинки (в процентах или пикселях)
+        // Инициализируем машинку в Коридоре при старте
+        let currentRoom = 'hallway';
+        let currentStep = 0; 
+
+        // Функция перемещения машинки по карте
+        function moveTaxi(roomId) {
+            const roomElement = document.getElementById(roomId);
+            const taxi = document.getElementById('taxi');
+            
+            // Вычисляем центр выбранной комнаты внутри карты
+            const mapRect = document.getElementById('map').getBoundingClientRect();
+            const roomRect = roomElement.getBoundingClientRect();
+
+            const posX = roomRect.left - mapRect.left + (roomRect.width / 2) - 20;
+            const posY = roomRect.top - mapRect.top + (roomRect.height / 2) - 20;
+
+            // Двигаем маркер
+            taxi.style.left = posX + 'px';
+            taxi.style.top = posY + 'px';
+            currentRoom = roomId;
+            
+            console.log("Водитель переместился в: " + roomId);
+        }
+
+        // Логика имитации шагов заказа (пока без сети, чисто симуляция работы)
+        // Чтобы протестировать, мы "якобы" получаем заказ через 3 секунды после старта
+        setTimeout(() => {
+            document.getElementById('statusText').innerText = "Новый заказ: Зал -> Кухня!";
+            document.getElementById('statusText').style.color = "#dc2626"; // Красный
+            const btn = document.getElementById('actionBtn');
+            btn.innerText = "Принять заказ";
+            btn.disabled = false;
+            currentStep = 1;
+        }, 3000);
+
+        function nextStep() {
+            const statusText = document.getElementById('statusText');
+            const btn = document.getElementById('actionBtn');
+
+            if (currentStep === 1) {
+                statusText.innerText = "Едем к пассажиру (в Зал)...";
+                statusText.style.color = "#2563eb";
+                btn.innerText = "Я подъехал (В Зале)";
+                currentStep = 2;
+            } else if (currentStep === 2) {
+                statusText.innerText = "Пассажир в такси. Едем на Кухню!";
+                statusText.style.color = "#f59e0b";
+                btn.innerText = "Завершить поездку";
+                currentStep = 3;
+            } else if (currentStep === 3) {
+                statusText.innerText = "Поездка успешно завершена! Кошелек: +150 игрушечных руб.";
+                statusText.style.color = "#059669";
+                btn.innerText = "Ожидание заказов...";
+                btn.disabled = true;
+                currentStep = 0;
+            }
+        }
+
+        // Сразу ставим машинку в стартовую комнату при загрузке страницы
+        window.onload = () => {
+            setTimeout(() => moveTaxi('hallway'), 100);
+        };
+    </script>
+</body>
+</html>
