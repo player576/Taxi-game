@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Игрушечное Такси - Таксометр и Редактор</title>
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
+
+        /* Шапка с переключателем режимов */
+        .header-menu {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            font-weight: bold;
+            border: 2px solid #3b82f6;
+            background: white;
+            color: #3b82f6;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .mode-btn.active {
+            background: #3b82f6;
+            color: white;
+        }
+
+        /* Панель статуса такси */
+        .status-panel {
+            width: 100%;
+            max-width: 500px;
+            background: #fff;
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .status-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #4b5563;
+            margin-bottom: 10px;
+            white-space: pre-line;
+        }
+
+        .btn {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .btn:disabled { background-color: #d1d5db; color: #9ca3af; }
+
+        /* Панель инструментов конструктора (скрыта по умолчанию) */
+        .editor-panel {
+            display: none;
+            width: 100%;
+            max-width: 500px;
+            background: #1e293b;
+            color: white;
+            padding: 10px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            gap: 8px;
+            justify-content: space-around;
+        }
+
+        .editor-btn {
+            background: #0ea5e9;
+            border: none;
+            color: white;
+            padding: 8px 12px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .editor-btn.danger { background: #ef4444; }
+
+        /* Игровое поле / Холст карты */
+        .map-wrapper {
+            width: 100%;
+            max-width: 500px;
+            position: relative;
+        }
+
+        /* Загрузка фото квартиры на фон */
+        .bg-input-label {
+            display: block;
+            text-align: center;
+            background: #e2e8f0;
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            border: 2px dashed #94a3b8;
+        }
+
+        .map-container {
+            width: 100%;
+            height: 380px;
+            background: #cbd5e1;
+            border-radius: 16px;
+            position: relative;
+            overflow: hidden;
+            border: 3px solid #64748b;
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        /* Динамическая комната */
+        .custom-room {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.85);
+            border: 3px solid #475569;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #1e293b;
+            font-size: 14px;
+            text-align: center;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
+            cursor: pointer;
+        }
+
+        /* Подсветки комнат в игре */
+        .custom-room.target-pickup { border-color: #3b82f6; background-color: rgba(219, 234, 254, 0.9); box-shadow: 0 0 12px #3b82f6; }
+        .custom-room.target-dropoff { border-color: #10b981; background-color: rgba(209, 250, 229, 0.9); box-shadow: 0 0 12px #10b981; }
+
+        /* Маркер машинки такси */
+        .taxi-marker {
+            width: 36px;
+            height: 36px;
+            background-color: #f59e0b;
+            border: 3px solid #111827;
+            border-radius: 50%;
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            pointer-events: none;
+            transition: all 0.3s ease-in-out;
+            z-index: 100;
+            display: none; /* Появится, когда будет хоть одна комната */
+        }
+
+        /* Стили для изменения размеров комнат в режиме редактора */
+        .resizer {
+            width: 15px;
+            height: 15px;
+            background: #ef4444;
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            cursor: se-resize;
+            border-radius: 50%;
+            display: none; /* Виден только в режиме редактора */
+        }
+
+        .custom-room.edit-mode .resizer { display: block; }
+        .custom-room.edit-mode { border-color: #ef4444; background: rgba(254, 226, 226, 0.8); }
+
+        .error-toast {
+            display: none;
+            position: fixed;
+            bottom: 25px;
+            background: #dc2626;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 1000;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header-menu">
+        <button id="modeGame" class="mode-btn active" onclick="setMode('game')">🎮 Режим Игры</button>
+        <button id="modeEdit" class="mode-btn" onclick="setMode('edit')">🛠️ Конструктор Карты</button>
+    </div>
+
+    <div id="gamePanel" class="status-panel">
+        <div id="statusText" class="status-value">Загрузите или создайте карту в Конструкторе!</div>
+        <button id="actionBtn" class="btn" onclick="nextStep()" disabled>Нет заказов</button>
+    </div>
+
+    <div id="editorPanel" class="editor-panel">
+        <button class="editor-btn" onclick="addNewRoom()">➕ Добавить комнату</button>
+        <button class="editor-btn danger" onclick="clearMap()">🗑️ Стереть всё</button>
+        <button class="editor-btn" style="background:#10b981;" onclick="saveMapToStorage()">💾 Сохранить карту</button>
+    </div>
+
+    <div class="map-wrapper">
+        <label id="bgLabel" class="bg-input-label" style="display:none;">
+            📷 Нажмите, чтобы загрузить фото/план квартиры на фон
+            <input type="file" id="bgInput" accept="image/*" style="display:none;" onchange="uploadBackground(this)">
+        </label>
+
+        <div class="map-container" id="map">
+            <div id="taxi" class="taxi-marker">🚖</div>
+        </div>
+    </div>
+
+    <div id="errorToast" class="error-toast"></div>
+
+    <script>
+        let currentMode = 'game'; // Текущий режим: game или edit
+        let roomsData = [];       // Массив с данными созданных комнат
+        let currentRoomId = null; // Где сейчас находится такси (ID комнаты)
+        let currentStep = 0;
+        let activePointA = null;
+        let activePointB = null;
+
+        const mapContainer = document.getElementById('map');
+        const taxiMarker = document.getElementById('taxi');
+
+        // --- СИСТЕМА ПЕРЕКЛЮЧЕНИЯ РЕЖИМОВ ---
+        function setMode(mode) {
+            currentMode = mode;
+            clearMapHighlights();
+            
+            if (mode === 'game') {
+                document.getElementById('modeGame').classList.add('active');
+                document.getElementById('modeEdit').classList.remove('active');
+                document.getElementById('gamePanel').style.display = 'block';
+                document.getElementById('editorPanel').style.display = 'none';
+                document.getElementById('bgLabel').style.display = 'none';
+                
+                // Выключаем режим редактирования у блоков комнат
+                document.querySelectorAll('.custom-room').forEach(r => r.classList.remove('edit-mode'));
+                renderMap(); // Перерисовываем начисто для игры
+                startSpawningOrders(); // Запускаем заказы
+            } else {
+                document.getElementById('modeGame').classList.remove('active');
+                document.getElementById('modeEdit').classList.add('active');
+                document.getElementById('gamePanel').style.display = 'none';
+                document.getElementById('editorPanel').style.display = 'flex';
+                document.getElementById('bgLabel').style.display = 'block';
+                
+                // Включаем визуальный режим редактора
+                document.querySelectorAll('.custom-room').forEach(r => r.classList.add('edit-mode'));
+                taxiMarker.style.display = 'none'; // Прячем такси в редакторе
+                stopOrders();
+            }
+        }
+
+        // --- ФУНКЦИЯ ЗАГРУЗКИ ФОТО КВАРТИРЫ ---
+        function uploadBackground(input) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    mapContainer.style.backgroundImage = `url('${e.target.result}')`;
+                    localStorage.setItem('taxi_map_bg', e.target.result); // Сохраняем фото в память!
+                };
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // --- ЛОГИКА РЕДАКТОРА (КОНСТРУКТОРА) ---
+        function addNewRoom() {
+            let name = prompt("Введите название комнаты (например: Кухня, Зал, Коридор):", "Комната");
+            if (!name) return;
+
+            let id = 'room_' + Date.now();
+            let newRoom = {
+                id: id,
+                name: name,
+                left: 30, // Стартовые координаты в процентах внутри карты
+                top: 30,
+                width: 120, // Размеры в пикселях
+                height: 100
+            };
+
+            roomsData.push(newRoom);
+            createRoomElement(newRoom);
+        }
+
+        function createRoomElement(data) {
+            const el = document.createElement('div');
+            el.className = 'custom-room' + (currentMode === 'edit' ? ' edit-mode' : '');
+            el.id = data.id;
+            el.innerText = data.name;
+            el.style.left = data.left + 'px';
+            el.style.top = data.top + 'px';
+            el.style.width = data.width + 'px';
+            el.style.height = data.height + 'px';
+
+            // Клик по комнате в режиме игры перемещает такси
+            el.onclick = (e) => {
+                if (currentMode === 'game') {
+                    moveTaxiToRoom(data.id);
+                }
+            };
+
+            // ---- КРАФТИМ ПЕРЕТАСКИВАНИЕ И ИЗМЕНЕНИЕ РАЗМЕРОВ (ДЛЯ МОБИЛОК И ПК) ----
+            const resizer = document.createElement('div');
+            resizer.className = 'resizer';
+            el.appendChild(resizer);
+
+            // Логика перемещения комнаты
+            el.onmousedown = el.ontouchstart = function(e) {
+                if (currentMode !== 'edit' || e.target === resizer) return;
+                e.preventDefault();
+                let event = e.touches ? e.touches[0] : e;
+                let startX = event.clientX - el.offsetLeft;
+                let startY = event.clientY - el.offsetTop;
+
+                document.onmousemove = document.ontouchmove = function(ev) {
+                    let moveEvent = ev.touches ? ev.touches[0] : ev;
+                    let newLeft = moveEvent.clientX - startX;
+                    let newTop = moveEvent.clientY - startY;
+                    
+                    el.style.left = newLeft + 'px';
+                    el.style.top = newTop + 'px';
+                    data.left = newLeft;
+                    data.top = newTop;
+                };
+                document.onmouseup = document.ontouchend = function() {
+                    document.onmousemove = document.ontouchmove = null;
+                };
+            };
+
+            // Логика изменения размера (красный кружок)
+            resizer.onmousedown = resizer.ontouchstart = function(e) {
+                if (currentMode !== 'edit') return;
+                e.stopPropagation();
+                e.preventDefault();
+                let event = e.touches ? e.touches[0] : e;
+                let startWidth = el.offsetWidth;
+                let startHeight = el.offsetHeight;
+                let startX = event.clientX;
+                let startY = event.clientY;
+
+                document.onmousemove = document.ontouchmove = function(ev) {
+                    let moveEvent = ev.touches ? ev.touches[0] : ev;
+                    let newWidth = startWidth + (moveEvent.clientX - startX);
+                    let newHeight = startHeight + (moveEvent.clientY - startY);
+
+                    if (newWidth > 40) { el.style.width = newWidth + 'px'; data.width = newWidth; }
+                    if (newHeight > 40) { el.style.height = newHeight + 'px'; data.height = newHeight; }
+                };
+                document.onmouseup = document.ontouchend = function() {
+                    document.onmousemove = document.ontouchmove = null;
+                };
+            };
+
+            mapContainer.appendChild(el);
+        }
+
+        function clearMap() {
+            if (confirm("Вы точно хотите стереть ВСЕ созданные комнаты?")) {
+                roomsData = [];
+                localStorage.removeItem('taxi_rooms_data');
+                localStorage.removeItem('taxi_map_bg');
+                mapContainer.style.backgroundImage = 'none';
+                renderMap();
+            }
+        }
+
+        function saveMapToStorage() {
+            localStorage.setItem('taxi_rooms_data', JSON.stringify(roomsData));
+            alert("Ура! План квартиры успешно сохранен в память телефона!");
+            setMode('game');
+        }
+
+        function renderMap() {
+            // Удаляем старые элементы комнат, оставляя только маркер такси
+            document.querySelectorAll('.custom-room').forEach(el => el.remove());
+            roomsData.forEach(room => createRoomElement(room));
+            
+            if (roomsData.length > 0 && currentMode === 'game') {
+                taxiMarker.style.display = 'flex';
+                if (!currentRoomId) moveTaxiToRoom(roomsData[0].id); // Спавним такси в первой комнате
+            }
+        }
+
+        // --- ИГРОВАЯ ЛОГИКА ТАКСИ ---
+        function moveTaxiToRoom(id) {
+            const roomEl = document.getElementById(id);
+            if (!roomEl) return;
+
+            const targetRoom = roomsData.find(r => r.id === id);
+            
+            // Ставим машинку ровно по центру кастомного блока комнаты
+            const posX = targetRoom.left + (targetRoom.width / 2) - 18;
+            const posY = targetRoom.top + (targetRoom.height / 2) - 18;
+
+            taxiMarker.style.left = posX + 'px';
+            taxiMarker.style.top = posY + 'px';
+            currentRoomId = id;
+        }
+
+        function showError(text) {
+            const toast = document.getElementById('errorToast');
+            toast.innerText = text;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        function clearMapHighlights() {
+            document.querySelectorAll('.custom-room').forEach(r => {
+                r.classList.remove('target-pickup', 'target-dropoff');
+            });
+        }
+
+        let orderTimer = null;
+        function startSpawningOrders() {
+            stopOrders();
+            if (roomsData.length < 2) {
+                document.getElementById('statusText').innerText = "Для симуляции создайте ХОТЯ БЫ 2 комнаты в Конструкторе!";
+                return;
+            }
+
+            document.getElementById('statusText').innerText = "Свободен. Поиск заказов по вашей квартире...";
+            document.getElementById('statusText').style.color = "#4b5563";
+
+            orderTimer = setTimeout(() => {
+                if (currentStep === 0 && roomsData.length >= 2) {
+                    // Берём случайные комнаты из созданных пользователем
+                    let randIndexA = Math.floor(Math.random() * roomsData.length);
+                    let randIndexB = Math.floor(Math.random() * roomsData.length);
+                    while (randIndexB === randIndexA) {
+                        randIndexB = Math.floor(Math.random() * roomsData.length);
+                    }
+
+                    activePointA = roomsData[randIndexA];
+                    activePointB = roomsData[randIndexB];
+
+                    document.getElementById('statusText').innerText = `🔔 ЗАКАЗ ПОСТУПИЛ!\nКлиент: в зоне [ ${activePointA.name} ]\nКуда едем: в зону [ ${activePointB.name} ]`;
+                    document.getElementById('statusText').style.color = "#dc2626";
+
+                    document.getElementById(activePointA.id).classList.add('target-pickup');
+
+                    const btn = document.getElementById('actionBtn');
+                    btn.innerText = "Принять заказ";
+                    btn.disabled = false;
+                    currentStep = 1;
+                }
+            }, 4000);
+        }
+
+        function stopOrders() {
+            clearTimeout(orderTimer);
+            document.getElementById('actionBtn').disabled = true;
+            document.getElementById('actionBtn').innerText = "Нет активных заказов";
+        }
+
+        function nextStep() {
+            const statusText = document.getElementById('statusText');
+            const btn = document.getElementById('actionBtn');
+
+            if (currentStep === 1) {
+                statusText.innerText = `Заказ принят.\nФизически двигайтесь в: ${activePointA.name}`;
+                statusText.style.color = "#2563eb";
+                btn.innerText = "Я на месте (Посадка)";
+                currentStep = 2;
+            } 
+            else if (currentStep === 2) {
+                if (currentRoomId !== activePointA.id) {
+                    showError(`Анти-чит: Вы не пришли в комнату "${activePointA.name}"!`);
+                    return;
+                }
+                clearMapHighlights();
+                document.getElementById(activePointB.id).classList.add('target-dropoff');
+
+                statusText.innerText = `Пассажир сел!\nМаршрут: ${activePointA.name} ➔ ${activePointB.name}\nВезите клиента!`;
+                statusText.style.color = "#f59e0b";
+                btn.innerText = "Завершить поездку";
+                currentStep = 3;
+            } 
+            else if (currentStep === 3) {
+                if (currentRoomId !== activePointB.id) {
+                    showError(`Анти-чит: Конечная точка должна быть "${activePointB.name}"!`);
+                    return;
+                }
+
+                clearMapHighlights();
+                statusText.innerText = `Поездка завершена без нарушений!\nЗаработано: +150 игрушечных грн.`;
+                statusText.style.color = "#059669";
+                btn.innerText = "Ожидание новых заказов...";
+                btn.disabled = true;
+                
+                activePointA = null;
+                activePointB = null;
+                currentStep = 0;
+
+                // Через 5 секунд ищем новый заказ
+                setTimeout(startSpawningOrders, 5000);
+            }
+        }
+
+        // --- СТАРТОВАЯ ИНИЦИАЛИЗАЦИЯ ИЗ ПАМЯТИ ---
+        window.onload = () => {
+            const savedRooms = localStorage.getItem('taxi_rooms_data');
+            const savedBg = localStorage.getItem('taxi_map_bg');
+
+            if (savedRooms) {
+                roomsData = JSON.parse(savedRooms);
+            }
+            if (savedBg) {
+                mapContainer.style.backgroundImage = `url('${savedBg}')`;
+            }
+            
+            renderMap();
+            if(roomsData.length >= 2) startSpawningOrders();
+        };
+    </script>
+</body>
+</html>
