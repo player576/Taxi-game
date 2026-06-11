@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Игрушечное Такси - Водитель (СЕТЬ)</title>
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            user-select: none;
+        }
+        h1 { color: #111827; font-size: 20px; margin: 5px 0; }
+        
+        /* Сетевая панель */
+        .network-panel {
+            width: 100%;
+            max-width: 500px;
+            background: #1e293b;
+            color: white;
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            text-align: center;
+            font-size: 14px;
+        }
+        .peer-id-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #38bdf8;
+            background: rgba(255,255,255,0.1);
+            padding: 4px 10px;
+            border-radius: 6px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+
+        .header-menu { width: 100%; max-width: 500px; display: flex; gap: 10px; margin-bottom: 10px; }
+        .mode-btn { flex: 1; padding: 10px; font-weight: bold; border: 2px solid #3b82f6; background: white; color: #3b82f6; border-radius: 8px; cursor: pointer; }
+        .mode-btn.active { background: #3b82f6; color: white; }
+        
+        .status-panel { width: 100%; max-width: 500px; background: #fff; padding: 12px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 10px; text-align: center; }
+        .status-value { font-size: 16px; font-weight: bold; color: #4b5563; margin-bottom: 10px; white-space: pre-line; }
+        
+        .btn { background-color: #2563eb; color: white; border: none; padding: 12px; font-size: 15px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; }
+        .btn:disabled { background-color: #d1d5db; color: #9ca3af; cursor: not-allowed; }
+        
+        .editor-panel { display: none; width: 100%; max-width: 500px; background: #334155; padding: 10px; border-radius: 12px; margin-bottom: 10px; gap: 8px; justify-content: space-around; }
+        .editor-btn { background: #0ea5e9; border: none; color: white; padding: 8px 12px; font-weight: bold; border-radius: 6px; cursor: pointer; }
+        .editor-btn.danger { background: #ef4444; }
+        
+        .map-container { width: 100%; height: 380px; background: #cbd5e1; border-radius: 16px; position: relative; overflow: hidden; border: 3px solid #64748b; }
+        
+        .custom-room { position: absolute; background: rgba(255, 255, 255, 0.85); border: 3px solid #475569; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #1e293b; font-size: 14px; text-align: center; cursor: pointer; }
+        .custom-room.target-pickup { border-color: #3b82f6; background-color: rgba(219, 234, 254, 0.9); box-shadow: 0 0 12px #3b82f6; }
+        .custom-room.target-dropoff { border-color: #10b981; background-color: rgba(209, 250, 229, 0.9); box-shadow: 0 0 12px #10b981; }
+        
+        .taxi-marker { width: 36px; height: 36px; background-color: #f59e0b; border: 3px solid #111827; border-radius: 50%; position: absolute; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); pointer-events: none; transition: all 0.3s ease-in-out; z-index: 100; display: none; }
+        .resizer { width: 15px; height: 15px; background: #ef4444; position: absolute; right: 0; bottom: 0; cursor: se-resize; border-radius: 50%; display: none; }
+        .custom-room.edit-mode .resizer { display: block; }
+        .custom-room.edit-mode { border-color: #ef4444; background: rgba(254, 226, 226, 0.8); }
+        
+        .error-toast { display: none; position: fixed; bottom: 25px; background: #dc2626; color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; z-index: 1000; }
+    </style>
+</head>
+<body>
+
+    <h1>🚕 Водитель Игрушечного Такси</h1>
+
+    <div class="network-panel">
+        <div id="netStatus">Запуск сетевого модуля...</div>
+        <div id="peerIdDisplay" class="peer-id-display">------</div>
+        <div style="font-size:11px; margin-top:5px; color:#94a3b8;">Продиктуй этот ID пассажиру для подключения</div>
+    </div>
+
+    <div class="header-menu">
+        <button id="modeGame" class="mode-btn active" onclick="setMode('game')">🎮 Режим Игры</button>
+        <button id="modeEdit" class="mode-btn" onclick="setMode('edit')">🛠️ Конструктор Карты</button>
+    </div>
+
+    <div id="gamePanel" class="status-panel">
+        <div id="statusText" class="status-value">Ожидание подключения пассажира...</div>
+        <button id="actionBtn" class="btn" onclick="nextStep()" disabled>Нет заказов</button>
+    </div>
+
+    <div id="editorPanel" class="editor-panel">
+        <button class="editor-btn" onclick="addNewRoom()">➕ Добавить комнату</button>
+        <button class="editor-btn danger" onclick="clearMap()">🗑️ Стереть всё</button>
+        <button class="editor-btn" style="background:#10b981;" onclick="saveMapToStorage()">💾 Сохранить карту</button>
+    </div>
+
+    <div class="map-container" id="map">
+        <div id="taxi" class="taxi-marker">🚖</div>
+    </div>
+
+    <div id="errorToast" class="error-toast"></div>
+
+    <script>
+        let currentMode = 'game';
+        let roomsData = [];
+        let currentRoomId = null;
+        let currentStep = 0;
+        let activePointA = null;
+        let activePointB = null;
+
+        // Сетевые переменные
+        let peer = null;
+        let conn = null; // Хранит активное соединение с пассажиром
+
+        const mapContainer = document.getElementById('map');
+        const taxiMarker = document.getElementById('taxi');
+
+        // Инициализация сети PeerJS
+        function initNetwork() {
+            // Создаем сетевой узел со случайным ID
+            peer = new Peer();
+
+            peer.on('open', (id) => {
+                document.getElementById('netStatus').innerText = "🟢 В сети. Ваш ID водителя:";
+                document.getElementById('peerIdDisplay').innerText = id;
+            });
+
+            // Ждем подключения от пассажира
+            peer.on('connection', (connection) => {
+                conn = connection;
+                document.getElementById('netStatus').innerText = "🤝 Пассажир подключился!";
+                document.getElementById('statusText').innerText = "Свободен. Ожидание заказа от пассажира...";
+                
+                // Сразу отправляем пассажиру карту нашей квартиры, чтобы у него всё отобразилось!
+                setTimeout(() => {
+                    sendToPassenger({ type: 'INIT_MAP', map: roomsData });
+                    // Также отправляем стартовую позицию машинки
+                    if(currentRoomId) sendToPassenger({ type: 'MOVE_TAXI', roomId: currentRoomId });
+                }, 1000);
+
+                // Слушаем сообщения от пассажира (например, когда он делает заказ)
+                conn.on('data', (data) => {
+                    if (data.type === 'NEW_ORDER') {
+                        handleIncomingOrder(data.idA, data.idB);
+                    }
+                });
+
+                conn.on('close', () => {
+                    document.getElementById('netStatus').innerText = "❌ Пассажир отключился";
+                    stopOrders();
+                });
+            });
+        }
+
+        // Функция отправки данных пассажиру
+        function sendToPassenger(obj) {
+            if (conn && conn.open) {
+                conn.send(obj);
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            clearMapHighlights();
+            if (mode === 'game') {
+                document.getElementById('modeGame').classList.add('active');
+                document.getElementById('modeEdit').classList.remove('active');
+                document.getElementById('gamePanel').style.display = 'block';
+                document.getElementById('editorPanel').style.display = 'none';
+                document.querySelectorAll('.custom-room').forEach(r => r.classList.remove('edit-mode'));
+                renderMap();
+                if(conn) document.getElementById('statusText').innerText = "Свободен. Ожидание заказа...";
+            } else {
+                document.getElementById('modeGame').classList.remove('active');
+                document.getElementById('modeEdit').classList.add('active');
+                document.getElementById('gamePanel').style.display = 'none';
+                document.getElementById('editorPanel').style.display = 'flex';
+                document.querySelectorAll('.custom-room').forEach(r => r.classList.add('edit-mode'));
+                taxiMarker.style.display = 'none';
+                stopOrders();
+            }
+        }
+
+        function addNewRoom() {
+            let name = prompt("Название комнаты:", "Комната");
+            if (!name) return;
+            let id = 'room_' + Date.now();
+            let newRoom = { id: id, name: name, left: 30, top: 30, width: 120, height: 100 };
+            roomsData.push(newRoom);
+            createRoomElement(newRoom);
+        }
+
+        function createRoomElement(data) {
+            const el = document.createElement('div');
+            el.className = 'custom-room' + (currentMode === 'edit' ? ' edit-mode' : '');
+            el.id = data.id;
+            el.innerText = data.name;
+            el.style.left = data.left + 'px'; el.style.top = data.top + 'px';
+            el.style.width = data.width + 'px'; el.style.height = data.height + 'px';
+
+            el.onclick = () => {
+                if (currentMode === 'game') {
+                    moveTaxiToRoom(data.id);
+                    // Передаем по сети пассажиру новое положение такси!
+                    sendToPassenger({ type: 'MOVE_TAXI', roomId: data.id });
+                }
+            };
+
+            const resizer = document.createElement('div');
+            resizer.className = 'resizer';
+            el.appendChild(resizer);
+
+            // Drag and drop для конструктора
+            el.onmousedown = el.ontouchstart = function(e) {
+                if (currentMode !== 'edit' || e.target === resizer) return;
+                let event = e.touches ? e.touches[0] : e;
+                let startX = event.clientX - el.offsetLeft;
+                let startY = event.clientY - el.offsetTop;
+                document.onmousemove = document.ontouchmove = function(ev) {
+                    let moveEvent = ev.touches ? ev.touches[0] : ev;
+                    let nL = moveEvent.clientX - startX; let nT = moveEvent.clientY - startY;
+                    el.style.left = nL + 'px'; el.style.top = nT + 'px';
+                    data.left = nL; data.top = nT;
+                };
+                document.onmouseup = document.ontouchend = function() { document.onmousemove = document.ontouchmove = null; };
+            };
+
+            // Изменение размеров
+            resizer.onmousedown = resizer.ontouchstart = function(e) {
+                if (currentMode !== 'edit') return;
+                e.stopPropagation();
+                let event = e.touches ? e.touches[0] : e;
+                let sW = el.offsetWidth; let sH = el.offsetHeight;
+                let sX = event.clientX; let sY = event.clientY;
+                document.onmousemove = document.ontouchmove = function(ev) {
+                    let moveEvent = ev.touches ? ev.touches[0] : ev;
+                    let nW = sW + (moveEvent.clientX - sX); let nH = sH + (moveEvent.clientY - sY);
+                    if (nW > 40) { el.style.width = nW + 'px'; data.width = nW; }
+                    if (nH > 40) { el.style.height = nH + 'px'; data.height = nH; }
+                };
+                document.onmouseup = document.ontouchend = function() { document.onmousemove = document.ontouchmove = null; };
+            };
+            mapContainer.appendChild(el);
+        }
+
+        function clearMap() {
+            if (confirm("Стереть карту?")) { roomsData = []; localStorage.removeItem('network_taxi_rooms'); renderMap(); }
+        }
+
+        function saveMapToStorage() {
+            localStorage.setItem('network_taxi_rooms', JSON.stringify(roomsData));
+            alert("Карта сохранена!");
+            setMode('game');
+            sendToPassenger({ type: 'INIT_MAP', map: roomsData }); // Обновляем карту у пассажира, если он в сети
+        }
+
+        function renderMap() {
+            document.querySelectorAll('.custom-room').forEach(el => el.remove());
+            roomsData.forEach(room => createRoomElement(room));
+            if (roomsData.length > 0 && currentMode === 'game') {
+                taxiMarker.style.display = 'flex';
+                if (!currentRoomId) moveTaxiToRoom(roomsData[0].id);
+            }
+        }
+
+        function moveTaxiToRoom(id) {
+            const targetRoom = roomsData.find(r => r.id === id);
+            if (!targetRoom) return;
+            const posX = targetRoom.left + (targetRoom.width / 2) - 18;
+            const posY = targetRoom.top + (targetRoom.height / 2) - 18;
+            taxiMarker.style.left = posX + 'px'; taxiMarker.style.top = posY + 'px';
+            currentRoomId = id;
+        }
+
+        function showError(text) {
+            const toast = document.getElementById('errorToast');
+            toast.innerText = text; toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+
+        function clearMapHighlights() {
+            document.querySelectorAll('.custom-room').forEach(r => r.classList.remove('target-pickup', 'target-dropoff'));
+        }
+
+        // Обработка реального заказа от пассажира
+        function handleIncomingOrder(idA, idB) {
+            if (currentStep !== 0) return; // Игнорируем, если уже заняты
+
+            activePointA = roomsData.find(r => r.id === idA);
+            activePointB = roomsData.find(r => r.id === idB);
+
+            document.getElementById('statusText').innerText = `🔔 РЕАЛЬНЫЙ ЗАКАЗ ОТ ПАССАЖИРА!\nПосадка: [ ${activePointA.name} ]\nНазначение: [ ${activePointB.name} ]`;
+            document.getElementById('statusText').style.color = "#dc2626";
+            document.getElementById(activePointA.id).classList.add('target-pickup');
+
+            const btn = document.getElementById('actionBtn');
+            btn.innerText = "Принять заказ";
+            btn.disabled = false;
+            currentStep = 1;
+        }
+
+        function stopOrders() {
+            document.getElementById('actionBtn').disabled = true;
+            document.getElementById('actionBtn').innerText = "Нет заказов";
+            document.getElementById('statusText').innerText = "Ожидание подключения...";
+            currentStep = 0;
+            clearMapHighlights();
+        }
+
+        function nextStep() {
+            const statusText = document.getElementById('statusText');
+            const btn = document.getElementById('actionBtn');
+
+            if (currentStep === 1) {
+                statusText.innerText = `Заказ принят. Идите в: ${activePointA.name}`;
+                statusText.style.color = "#2563eb";
+                btn.innerText = "Я на месте (Посадка)";
+                currentStep = 2;
+                
+                // Передаем статус пассажиру
+                sendToPassenger({ type: 'STATUS', text: 'Такси принято и едет к вам!' });
+            } 
+            else if (currentStep === 2) {
+                if (currentRoomId !== activePointA.id) {
+                    showError(`Анти-чит: Вы не дошли до комнаты "${activePointA.name}"!`);
+                    return;
+                }
+                clearMapHighlights();
+                document.getElementById(activePointB.id).classList.add('target-dropoff');
+
+                statusText.innerText = `Пассажир в такси. Маршрут до: ${activePointB.name}`;
+                statusText.style.color = "#f59e0b";
+                btn.innerText = "Завершить поездку";
+                currentStep = 3;
+
+                sendToPassenger({ type: 'STATUS', text: 'Вы сели в такси. В пути...' });
+                sendToPassenger({ type: 'HIGHLIGHT', idB: activePointB.id });
+            } 
+            else if (currentStep === 3) {
+                if (currentRoomId !== activePointB.id) {
+                    showError(`Анти-чит: Вы не доехали до точки "${activePointB.name}"!`);
+                    return;
+                }
+
+                clearMapHighlights();
+                statusText.innerText = `Поездка завершена!\nБаланс: +150 игрушечных грн.`;
+                statusText.style.color = "#059669";
+                btn.innerText = "Ожидание новых заказов...";
+                btn.disabled = true;
+
+                sendToPassenger({ type: 'STATUS', text: 'Ура! Вы приехали. Стоимость: 150 игрушечных грн. Спасибо за поездку!' });
+                
+                activePointA = null; activePointB = null; currentStep = 0;
+            }
+        }
+
+        window.onload = () => {
+            const savedRooms = localStorage.getItem('network_taxi_rooms');
+            if (savedRooms) roomsData = JSON.parse(savedRooms);
+            renderMap();
+            initNetwork(); // Запуск сети
+        };
+    </script>
+</body>
+</html>
