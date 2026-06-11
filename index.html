@@ -9,7 +9,7 @@
         *, *::before, *::after { box-sizing: border-box; }
         body {
             font-family: 'Segoe UI', Roboto, sans-serif;
-            background-color: #f0fdf4; /* Слегка зеленый клиентский фон */
+            background-color: #f0fdf4;
             margin: 0;
             padding: 10px;
             display: flex;
@@ -18,7 +18,6 @@
         }
         h1 { color: #166534; font-size: 20px; margin: 5px 0; }
 
-        /* Панель подключения */
         .connect-panel {
             width: 100%;
             max-width: 500px;
@@ -30,13 +29,14 @@
             text-align: center;
         }
         .net-input {
-            width: 60%;
+            width: 50%;
             padding: 8px;
-            font-size: 16px;
+            font-size: 18px;
             border-radius: 6px;
             border: none;
             text-align: center;
             font-weight: bold;
+            letter-spacing: 2px;
         }
         .connect-btn {
             background: #1e293b;
@@ -47,9 +47,9 @@
             font-weight: bold;
             border-radius: 6px;
             cursor: pointer;
+            margin-left: 5px;
         }
 
-        /* Заказ-панель */
         .order-panel {
             width: 100%;
             max-width: 500px;
@@ -59,47 +59,32 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.05);
             margin-bottom: 10px;
         }
-        .status-box {
-            background: #f3f4f6;
-            padding: 10px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: bold;
-            color: #374151;
-            margin-bottom: 10px;
-            font-size: 15px;
-            white-space: pre-line;
-        }
-        .selector-group {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        .select-box {
-            flex: 1;
-            padding: 10px;
-            font-size: 14px;
-            border-radius: 8px;
-            border: 2px solid #bbf7d0;
-            font-weight: bold;
-        }
-        .order-btn {
-            background: #16a34a;
-            color: white;
-            border: none;
-            padding: 12px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 8px;
-            width: 100%;
-            cursor: pointer;
-        }
+        .status-box { background: #f3f4f6; padding: 10px; border-radius: 8px; text-align: center; font-weight: bold; color: #374151; margin-bottom: 10px; font-size: 15px; white-space: pre-line; }
+        .selector-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        .select-box { flex: 1; padding: 10px; font-size: 14px; border-radius: 8px; border: 2px solid #bbf7d0; font-weight: bold; }
+        .order-btn { background: #16a34a; color: white; border: none; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 8px; width: 100%; cursor: pointer; }
         .order-btn:disabled { background: #d1d5db; color: #9ca3af; cursor: not-allowed; }
 
-        /* Поле карты */
-        .map-container { width: 100%; height: 380px; background: #cbd5e1; border-radius: 16px; position: relative; overflow: hidden; border: 3px solid #16a34a; }
+        /* Исправление бага 2: Окно просмотра карты со скроллом для Пассажира */
+        .map-viewport {
+            width: 100%;
+            max-width: 500px;
+            height: 380px;
+            border-radius: 16px;
+            border: 3px solid #16a34a;
+            overflow: auto; /* Позволяет крутить карту пальцем во все стороны */
+            background: #cbd5e1;
+            position: relative;
+        }
+
+        .map-container { 
+            width: 800px;  /* Размер совпадает с контейнером водителя */
+            height: 600px; 
+            position: relative; 
+            background: #cbd5e1;
+        }
         
-        .passenger-room { position: absolute; background: rgba(255, 255, 255, 0.9); border: 3px solid #16803d; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #14532d; font-size: 14px; text-align: center; pointer-events: none; }
+        .passenger-room { position: absolute; background: rgba(255, 255, 255, 0.9); border: 3px solid #16803d; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #14532d; font-size: 14px; text-align: center; pointer-events: none; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
         .passenger-room.highlight-target { border-color: #ef4444; background: rgba(254, 226, 226, 0.9); box-shadow: 0 0 12px #ef4444; }
 
         .taxi-marker { width: 36px; height: 36px; background-color: #f59e0b; border: 3px solid #111827; border-radius: 50%; position: absolute; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); transition: all 0.3s ease-in-out; z-index: 100; display: none; }
@@ -111,23 +96,23 @@
 
     <div class="connect-panel">
         <div id="connStatus" style="margin-bottom:8px; font-weight:bold;">🔴 Вы не подключены к водителю</div>
-        <input type="text" id="driverIdInput" class="net-input" placeholder="Введите ID Водителя">
+        <input type="number" id="driverIdInput" class="net-input" placeholder="4 цифры" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
         <button class="connect-btn" onclick="connectToDriver()">Войти</button>
     </div>
 
     <div class="order-panel">
         <div id="statusBox" class="status-box">Для начала сделайте подключение по ID</div>
-        
         <div class="selector-group">
             <select id="selectA" class="select-box" disabled><option>Откуда...</option></select>
             <select id="selectB" class="select-box" disabled><option>Куда...</option></select>
         </div>
-        
         <button id="orderBtn" class="order-btn" onclick="sendOrder()" disabled>Заказать такси</button>
     </div>
 
-    <div class="map-container" id="map">
-        <div id="taxi" class="taxi-marker">🚖</div>
+    <div class="map-viewport">
+        <div class="map-container" id="map">
+            <div id="taxi" class="taxi-marker">🚖</div>
+        </div>
     </div>
 
     <script>
@@ -139,25 +124,25 @@
         const taxiMarker = document.getElementById('taxi');
 
         function connectToDriver() {
-            const id = document.getElementById('driverIdInput').value.trim();
-            if (!id) return alert("Введите рабочий ID водителя!");
+            const shortId = document.getElementById('driverIdInput').value.trim();
+            if (shortId.length !== 4) return alert("Введите корректный 4-значный код!");
 
-            document.getElementById('connStatus').innerText = "⏳ Подключение...";
+            document.getElementById('connStatus').innerText = "⏳ Подключение к " + shortId + "...";
             
             peer = new Peer();
             peer.on('open', () => {
-                // Подключаемся к водителю по его ID
-                conn = peer.connect(id);
+                // Модифицируем ID обратно под системный префикс
+                const fullId = 'toy-taxi-' + shortId;
+                conn = peer.connect(fullId);
 
                 conn.on('open', () => {
-                    document.getElementById('connStatus').innerText = "🟢 Успешно подключено к такси!";
+                    document.getElementById('connStatus').innerText = "🟢 Подключено к такси [" + shortId + "]";
                     document.getElementById('statusBox').innerText = "Карта получена. Выберите маршрут!";
                     document.getElementById('orderBtn').disabled = false;
                     document.getElementById('selectA').disabled = false;
                     document.getElementById('selectB').disabled = false;
                 });
 
-                // Слушаем пакеты данных от водителя
                 conn.on('data', (data) => {
                     if (data.type === 'INIT_MAP') {
                         mapRooms = data.map;
@@ -170,7 +155,6 @@
                         document.getElementById('statusBox').innerText = data.text;
                     }
                     if (data.type === 'HIGHLIGHT') {
-                        // Подсвечиваем пассажиру целевую комнату доставки
                         document.querySelectorAll('.passenger-room').forEach(r => r.classList.remove('highlight-target'));
                         const target = document.getElementById('p_' + data.idB);
                         if(target) target.classList.add('highlight-target');
@@ -182,18 +166,20 @@
                     location.reload();
                 });
             });
+            
+            peer.on('error', (err) => {
+                alert("Не удалось найти водителя с таким кодом. Проверьте цифры!");
+                document.getElementById('connStatus').innerText = "🔴 Ошибка подключения";
+            });
         }
 
-        // Строим карту комнат, присланную водителем
         function buildPassengerMap() {
             document.querySelectorAll('.passenger-room').forEach(el => el.remove());
-            
             const selectA = document.getElementById('selectA');
             const selectB = document.getElementById('selectB');
             selectA.innerHTML = ''; selectB.innerHTML = '';
 
             mapRooms.forEach(room => {
-                // Отрисовка на карте
                 const el = document.createElement('div');
                 el.className = 'passenger-room';
                 el.id = 'p_' + room.id;
@@ -202,12 +188,10 @@
                 el.style.width = room.width + 'px'; el.style.height = room.height + 'px';
                 mapContainer.appendChild(el);
 
-                // Заполнение селекторов выбора
                 let optA = document.createElement('option'); optA.value = room.id; optA.text = room.name;
                 let optB = document.createElement('option'); optB.value = room.id; optB.text = room.name;
                 selectA.appendChild(optA); selectB.appendChild(optB);
             });
-
             taxiMarker.style.display = 'flex';
         }
 
@@ -219,16 +203,13 @@
             taxiMarker.style.left = posX + 'px'; taxiMarker.style.top = posY + 'px';
         }
 
-        // Отправка заказа водителю
         function sendOrder() {
             const idA = document.getElementById('selectA').value;
             const idB = document.getElementById('selectB').value;
-
-            if (idA === idB) return alert("Точка посадки и назначения должны отличаться!");
-
+            if (idA === idB) return alert("Точки А и Б должны отличаться!");
             if (conn && conn.open) {
                 conn.send({ type: 'NEW_ORDER', idA: idA, idB: idB });
-                document.getElementById('statusBox').innerText = "Заказ отправлен! Ожидание ответа водителя...";
+                document.getElementById('statusBox').innerText = "Заказ отправлен водителю! Ждем ответа...";
             }
         }
     </script>
