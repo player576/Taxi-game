@@ -20,7 +20,7 @@
 
         .connect-panel {
             width: 100%;
-            max-width: 500px;
+            max-width: 450px;
             background: #15803d;
             color: white;
             padding: 12px;
@@ -36,7 +36,6 @@
             border: none;
             text-align: center;
             font-weight: bold;
-            letter-spacing: 2px;
         }
         .connect-btn {
             background: #1e293b;
@@ -52,7 +51,7 @@
 
         .order-panel {
             width: 100%;
-            max-width: 500px;
+            max-width: 450px;
             background: white;
             padding: 15px;
             border-radius: 12px;
@@ -65,26 +64,18 @@
         .order-btn { background: #16a34a; color: white; border: none; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 8px; width: 100%; cursor: pointer; }
         .order-btn:disabled { background: #d1d5db; color: #9ca3af; cursor: not-allowed; }
 
-        /* Исправление бага 2: Окно просмотра карты со скроллом для Пассажира */
-        .map-viewport {
-            width: 100%;
-            max-width: 500px;
-            height: 380px;
-            border-radius: 16px;
-            border: 3px solid #16a34a;
-            overflow: auto; /* Позволяет крутить карту пальцем во все стороны */
-            background: #cbd5e1;
-            position: relative;
-        }
-
         .map-container { 
-            width: 800px;  /* Размер совпадает с контейнером водителя */
-            height: 600px; 
+            width: 100%;  
+            max-width: 450px;
+            height: 400px; 
             position: relative; 
             background: #cbd5e1;
+            border-radius: 16px;
+            border: 3px solid #16a34a;
+            overflow: hidden;
         }
         
-        .passenger-room { position: absolute; background: rgba(255, 255, 255, 0.9); border: 3px solid #16803d; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #14532d; font-size: 14px; text-align: center; pointer-events: none; box-shadow: 2px 2px 5px rgba(0,0,0,0.05); }
+        .passenger-room { position: absolute; background: rgba(255, 255, 255, 0.9); border: 3px solid #16803d; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #14532d; font-size: 14px; text-align: center; pointer-events: none; }
         .passenger-room.highlight-target { border-color: #ef4444; background: rgba(254, 226, 226, 0.9); box-shadow: 0 0 12px #ef4444; }
 
         .taxi-marker { width: 36px; height: 36px; background-color: #f59e0b; border: 3px solid #111827; border-radius: 50%; position: absolute; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); transition: all 0.3s ease-in-out; z-index: 100; display: none; }
@@ -95,13 +86,13 @@
     <h1>🚖 Вызов Игрушечного Такси</h1>
 
     <div class="connect-panel">
-        <div id="connStatus" style="margin-bottom:8px; font-weight:bold;">🔴 Вы не подключены к водителю</div>
-        <input type="number" id="driverIdInput" class="net-input" placeholder="4 цифры" oninput="if(this.value.length > 4) this.value = this.value.slice(0,4);">
+        <div id="connStatus" style="margin-bottom:8px; font-weight:bold;">🔴 Вы не подключены</div>
+        <input type="number" id="driverIdInput" class="net-input" placeholder="Код водителя">
         <button class="connect-btn" onclick="connectToDriver()">Войти</button>
     </div>
 
     <div class="order-panel">
-        <div id="statusBox" class="status-box">Для начала сделайте подключение по ID</div>
+        <div id="statusBox" class="status-box">Введите 4 цифры для подключения</div>
         <div class="selector-group">
             <select id="selectA" class="select-box" disabled><option>Откуда...</option></select>
             <select id="selectB" class="select-box" disabled><option>Куда...</option></select>
@@ -109,10 +100,8 @@
         <button id="orderBtn" class="order-btn" onclick="sendOrder()" disabled>Заказать такси</button>
     </div>
 
-    <div class="map-viewport">
-        <div class="map-container" id="map">
-            <div id="taxi" class="taxi-marker">🚖</div>
-        </div>
+    <div class="map-container" id="map">
+        <div id="taxi" class="taxi-marker">🚖</div>
     </div>
 
     <script>
@@ -125,19 +114,19 @@
 
         function connectToDriver() {
             const shortId = document.getElementById('driverIdInput').value.trim();
-            if (shortId.length !== 4) return alert("Введите корректный 4-значный код!");
+            if (shortId.length !== 4) return alert("Введите 4 цифры!");
 
             document.getElementById('connStatus').innerText = "⏳ Подключение к " + shortId + "...";
             
+            if (peer) peer.destroy(); // Сбрасываем старые сессии, если были
+            
             peer = new Peer();
             peer.on('open', () => {
-                // Модифицируем ID обратно под системный префикс
-                const fullId = 'toy-taxi-' + shortId;
-                conn = peer.connect(fullId);
+                conn = peer.connect(shortId); // Цепляемся напрямую к 4 цифрам!
 
                 conn.on('open', () => {
-                    document.getElementById('connStatus').innerText = "🟢 Подключено к такси [" + shortId + "]";
-                    document.getElementById('statusBox').innerText = "Карта получена. Выберите маршрут!";
+                    document.getElementById('connStatus').innerText = "🟢 Подключено к [" + shortId + "]";
+                    document.getElementById('statusBox').innerText = "Карта получена!";
                     document.getElementById('orderBtn').disabled = false;
                     document.getElementById('selectA').disabled = false;
                     document.getElementById('selectB').disabled = false;
@@ -162,14 +151,14 @@
                 });
 
                 conn.on('close', () => {
-                    alert("Соединение разорвано!");
+                    alert("Соединение закрыто водителем.");
                     location.reload();
                 });
             });
             
             peer.on('error', (err) => {
-                alert("Не удалось найти водителя с таким кодом. Проверьте цифры!");
-                document.getElementById('connStatus').innerText = "🔴 Ошибка подключения";
+                alert("Ошибка! Проверьте, запущен ли таксометр водителя.");
+                document.getElementById('connStatus').innerText = "🔴 Ошибка";
             });
         }
 
@@ -206,10 +195,10 @@
         function sendOrder() {
             const idA = document.getElementById('selectA').value;
             const idB = document.getElementById('selectB').value;
-            if (idA === idB) return alert("Точки А и Б должны отличаться!");
+            if (idA === idB) return alert("Выберите разные комнаты!");
             if (conn && conn.open) {
                 conn.send({ type: 'NEW_ORDER', idA: idA, idB: idB });
-                document.getElementById('statusBox').innerText = "Заказ отправлен водителю! Ждем ответа...";
+                document.getElementById('statusBox').innerText = "Заказ отправлен! Ждём принятия...";
             }
         }
     </script>
