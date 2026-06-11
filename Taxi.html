@@ -45,11 +45,12 @@
         }
 
         .status-value {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
-            color: #059669; 
+            color: #4b5563; 
             margin: 5px 0 15px 0;
-            line-height: 1.3;
+            line-height: 1.4;
+            white-space: pre-line;
         }
 
         .btn {
@@ -108,11 +109,23 @@
             border-color: #3b82f6; 
         }
 
+        /* Подсветка комнат для подсказки маршрута */
+        .room.target-pickup {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+            box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+        }
+        .room.target-dropoff {
+            border-color: #10b981;
+            background-color: #ecfdf5;
+            box-shadow: 0 0 8px rgba(16, 185, 129, 0.5);
+        }
+
         /* Иконка машинки такси */
         .taxi-marker {
             width: 40px;
             height: 40px;
-            background-color: #f59e0b; /* Желтый такси */
+            background-color: #f59e0b; 
             border: 3px solid #111827;
             border-radius: 50%;
             position: absolute;
@@ -121,18 +134,16 @@
             justify-content: center;
             font-size: 20px;
             box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-            pointer-events: none; /* Клик проходит сквозь машинку на комнату */
-            transition: all 0.4s ease-in-out; /* Плавное скольжение машинки */
+            pointer-events: none; 
+            transition: all 0.4s ease-in-out; 
             z-index: 10;
         }
 
-        /* Особая разметка для коридора во всю длину */
         .corridor {
             grid-column: span 2;
             height: 60px;
         }
 
-        /* Всплывающее уведомление об ошибке читерства */
         .error-toast {
             display: none;
             position: fixed;
@@ -151,16 +162,15 @@
 </head>
 <body>
 
-    <h1>🚕 Таксометр Водителя</h1>
+    <h1>🚕 Таксометр Водителя (Защищенный)</h1>
 
     <div class="status-panel">
-        <div class="status-title">Текущий статус</div>
-        <div id="statusText" class="status-value">Свободен. Ожидание заказов...</div>
+        <div class="status-title">Статус системы</div>
+        <div id="statusText" class="status-value">Свободен. Ожидание клиента...</div>
         <button id="actionBtn" class="btn" onclick="nextStep()" disabled>Нет активных заказов</button>
     </div>
 
     <div class="map-container" id="map">
-        
         <div class="room" id="kitchen" onclick="moveTaxi('kitchen')">Кухня</div>
         <div class="room" id="bedroom" onclick="moveTaxi('bedroom')">Спальня</div>
         <div class="room corridor" id="hallway" onclick="moveTaxi('hallway')">Коридор</div>
@@ -173,7 +183,6 @@
     <div id="errorToast" class="error-toast"></div>
 
     <script>
-        // Игровая база данных комнат (для красивого текста в ошибках)
         const roomNames = {
             'kitchen': 'Кухня',
             'bedroom': 'Спальня',
@@ -182,93 +191,113 @@
             'bathroom': 'Ванная'
         };
 
-        let currentRoom = 'hallway'; // Где машина сейчас физически
-        let currentStep = 0;         // Текущий шаг заказа
+        let currentRoom = 'hallway'; 
+        let currentStep = 0;         
 
-        // Жестко прописанные точки тестового заказа
-        const pointA = 'livingroom'; // Откуда забрать (Зал)
-        const pointB = 'kitchen';    // Куда привезти (Кухня)
+        // Текущие точки активного заказа (изначально пустые)
+        let activePointA = null; 
+        let activePointB = null; 
 
-        // Функция плавного перемещения машинки по карте
         function moveTaxi(roomId) {
             const roomElement = document.getElementById(roomId);
             const taxi = document.getElementById('taxi');
             const mapRect = document.getElementById('map').getBoundingClientRect();
             const roomRect = roomElement.getBoundingClientRect();
 
-            // Расчет центра комнаты относительно сетки карты
             const posX = roomRect.left - mapRect.left + (roomRect.width / 2) - 20;
             const posY = roomRect.top - mapRect.top + (roomRect.height / 2) - 20;
 
             taxi.style.left = posX + 'px';
             taxi.style.top = posY + 'px';
             
-            currentRoom = roomId; // Обновляем текущую геопозицию водителя
+            currentRoom = roomId; 
+            console.log(`Водитель переехал в: ${roomNames[roomId]}`);
         }
 
-        // Показывает красивую ошибку вместо стандартного alert
         function showError(text) {
             const toast = document.getElementById('errorToast');
             toast.innerText = text;
             toast.style.display = 'block';
-            setTimeout(() => {
-                toast.style.display = 'none';
-            }, 3000);
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
         }
 
-        // Эмуляция входящего заказа через 3 секунды после открытия приложения
+        // Очистка подсветки комнат
+        function clearMapHighlights() {
+            document.querySelectorAll('.room').forEach(room => {
+                room.classList.remove('target-pickup', 'target-dropoff');
+            });
+        }
+
+        // Симуляция входящего случайного заказа
         setTimeout(() => {
             if (currentStep === 0) {
-                document.getElementById('statusText').innerText = `Входящий заказ!\nМаршрут: ${roomNames[pointA]} ➔ ${roomNames[pointB]}`;
-                document.getElementById('statusText').style.color = "#dc2626"; // Красный статус тревоги
+                // Генерируем случайные отличные друг от друга комнаты
+                const rooms = Object.keys(roomNames);
+                activePointA = 'livingroom'; // Откуда: Зал
+                activePointB = 'kitchen';    // Куда: Кухня
+
+                document.getElementById('statusText').innerText = `🔔 НОВЫЙ ЗАКАЗ!\nКлиент ждет в: ${roomNames[activePointA]}\nЕхать в: ${roomNames[activePointB]}`;
+                document.getElementById('statusText').style.color = "#dc2626";
                 
+                // Подсвечиваем синим точку А на карте для наглядности
+                document.getElementById(activePointA).classList.add('target-pickup');
+
                 const btn = document.getElementById('actionBtn');
                 btn.innerText = "Принять заказ";
                 btn.disabled = false;
-                currentStep = 1; // Перешли на этап ожидания принятия
+                currentStep = 1; 
             }
         }, 3000);
 
-        // Пошаговая логика таксометра с жесткой проверкой «анти-читер»
+        // Пошаговый автомат таксометра с полной изоляцией багов
         function nextStep() {
             const statusText = document.getElementById('statusText');
             const btn = document.getElementById('actionBtn');
 
             if (currentStep === 1) {
-                // Водитель нажал "Принять заказ". Тут проверять комнату не нужно, он просто взял заказ в работу.
-                statusText.innerText = `Принято. Направляйтесь в: ${roomNames[pointA]}`;
-                statusText.style.color = "#2563eb"; // Синий цвет пути
+                // ШАГ 1: Принятие заказа. Водитель может принять заказ из ЛЮБОЙ точки (он ведь просто взял телефон).
+                statusText.innerText = `Заказ принят!\nДвигайтесь в точку посадки: ${roomNames[activePointA]}`;
+                statusText.style.color = "#2563eb";
                 btn.innerText = "Я на месте (Посадка)";
-                currentStep = 2; // Переходим к шагу ожидания в точке А
+                currentStep = 2; 
             } 
             else if (currentStep === 2) {
-                // Водитель утверждает, что приехал за пассажиром (в Зал)
-                if (currentRoom !== pointA) {
-                    showError(`Анти-чит: Вы не в Зале! Вы находитесь в: ${roomNames[currentRoom]}`);
-                    return; // Блокируем прогресс заказа
+                // ШАГ 2: Кнопка "Я на месте". Жёстко проверяем, доехал ли таксист до Точки А (Зал).
+                if (currentRoom !== activePointA) {
+                    showError(`Ошибка! Вы не в точке посадки (${roomNames[activePointA]})! Вы находитесь в: ${roomNames[currentRoom]}`);
+                    return; 
                 }
                 
-                statusText.innerText = `Пассажир в машине!\nВезите в: ${roomNames[pointB]}`;
-                statusText.style.color = "#f59e0b"; // Оранжевый цвет поездки
+                // Переключаем подсветку карты на точку Б (Кухня)
+                clearMapHighlights();
+                document.getElementById(activePointB).classList.add('target-dropoff');
+
+                statusText.innerText = `Пассажир в салоне.\nМаршрут: ${roomNames[activePointA]} ➔ ${roomNames[activePointB]}\nВезите клиента!`;
+                statusText.style.color = "#f59e0b";
                 btn.innerText = "Завершить поездку";
-                currentStep = 3; // Переходим к шагу поездки до точки Б
+                currentStep = 3; 
             } 
             else if (currentStep === 3) {
-                // Водитель пытается завершить поездку (на Кухне)
-                if (currentRoom !== pointB) {
-                    showError(`Анти-чит: Вы не доехали до Кухни! Сейчас вы в: ${roomNames[currentRoom]}`);
-                    return; // Блокируем получение денег
+                // ШАГ 3: Кнопка "Завершить поездку". Жёстко проверяем, доехал ли таксист до Точки Б (Кухня).
+                if (currentRoom !== activePointB) {
+                    showError(`Читерство обнаружено! Вы не доехали до точки назначения (${roomNames[activePointB]})! Вы сейчас в: ${roomNames[currentRoom]}`);
+                    return; 
                 }
 
-                statusText.innerText = "Поездка успешно завершена!\nБаланс: +150 игрушечных грн.";
-                statusText.style.color = "#059669"; // Зеленый цвет успеха
+                // Успешный финиш
+                clearMapHighlights();
+                statusText.innerText = `Поездка успешно завершена!\nМаршрут выполнен без нарушений.\nБаланс: +150 игрушечных грн.`;
+                statusText.style.color = "#059669";
                 btn.innerText = "Ожидание новых заказов...";
                 btn.disabled = true;
-                currentStep = 0; // Сброс в начальное состояние
+                
+                // Сброс данных заказа
+                activePointA = null;
+                activePointB = null;
+                currentStep = 0; 
             }
         }
 
-        // Автоматически ставим машинку в Коридор при старте страницы
         window.onload = () => {
             setTimeout(() => moveTaxi('hallway'), 100);
         };
