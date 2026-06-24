@@ -54,16 +54,16 @@
         .editor-btn { background: #0ea5e9; border: none; color: white; padding: 8px 12px; font-weight: bold; border-radius: 6px; cursor: pointer; }
         .editor-btn.danger { background: #ef4444; }
         
-        /* Стабильный контейнер карты под размер экрана */
         .map-container { 
             width: 100%;  
             max-width: 450px;
-            height: 400px; 
+            height: 350px; 
             position: relative; 
             background: #cbd5e1;
             border-radius: 16px;
             border: 3px solid #64748b;
             overflow: hidden;
+            margin-bottom: 10px;
         }
         
         .custom-room { position: absolute; background: rgba(255, 255, 255, 0.9); border: 3px solid #475569; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #1e293b; font-size: 14px; text-align: center; cursor: pointer; touch-action: none; }
@@ -75,6 +75,16 @@
         .custom-room.edit-mode .resizer { display: block; }
         .custom-room.edit-mode { border-color: #ef4444; background: rgba(254, 226, 226, 0.8); }
         
+        /* СТИЛИ ЧАТА */
+        .chat-panel { width: 100%; max-width: 450px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 10px; display: flex; flex-direction: column; gap: 5px; }
+        .chat-box { width: 100%; height: 100px; border: 1px solid #e5e7eb; border-radius: 8px; overflow-y: auto; padding: 8px; font-size: 13px; background: #f9fafb; }
+        .chat-msg { margin-bottom: 4px; line-height: 1.4; word-break: break-all; }
+        .chat-msg.driver { color: #1e3a8a; }
+        .chat-msg.passenger { color: #15803d; }
+        .chat-input-row { display: flex; gap: 5px; }
+        .chat-input { flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+        .chat-send-btn { background: #1e293b; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+
         .error-toast { display: none; position: fixed; bottom: 25px; background: #dc2626; color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; z-index: 1000; }
     </style>
 </head>
@@ -107,6 +117,16 @@
         <div id="taxi" class="taxi-marker">🚖</div>
     </div>
 
+    <div class="chat-panel">
+        <div class="chat-box" id="chatBox">
+            <div style="color:#9ca3af;font-style:italic;text-align:center;">Чат пуст. Подключите пассажира...</div>
+        </div>
+        <div class="chat-input-row">
+            <input type="text" id="chatInput" class="chat-input" placeholder="Написать пассажиру..." disabled onkeydown="if(event.key==='Enter') sendChatMessage()">
+            <button id="chatSendBtn" class="chat-send-btn" onclick="sendChatMessage()" disabled>Отправить</button>
+        </div>
+    </div>
+
     <div id="errorToast" class="error-toast"></div>
 
     <script>
@@ -121,12 +141,10 @@
 
         const mapContainer = document.getElementById('map');
         const taxiMarker = document.getElementById('taxi');
+        const chatBox = document.getElementById('chatBox');
 
         function initNetwork() {
-            // Генерируем красивый 4-значный ID
             const shortId = Math.floor(1000 + Math.random() * 9000).toString();
-            
-            // Регистрируем чистый ID без лишних кавычек и сложных префиксов
             peer = new Peer(shortId);
 
             peer.on('open', (id) => {
@@ -135,11 +153,8 @@
             });
 
             peer.on('error', (err) => {
-                if (err.type === 'unavailable-id') {
-                    initNetwork(); // Пересоздаем, если занят
-                } else {
-                    document.getElementById('netStatus').innerText = "🔴 Ошибка сети. Перезагрузите страницу.";
-                }
+                if (err.type === 'unavailable-id') { initNetwork(); } 
+                else { document.getElementById('netStatus').innerText = "🔴 Ошибка сети."; }
             });
 
             peer.on('connection', (connection) => {
@@ -147,7 +162,11 @@
                 document.getElementById('netStatus').innerText = "🤝 Пассажир подключен!";
                 document.getElementById('statusText').innerText = "Свободен. Ожидание заказа...";
                 
-                // Передаем карту сразу после стабилизации канала
+                // Включаем интерфейс чата
+                document.getElementById('chatInput').disabled = false;
+                document.getElementById('chatSendBtn').disabled = false;
+                chatBox.innerHTML = '<div style="color:#15803d; text-align:center;">Пассажир вошел в чат</div>';
+
                 setTimeout(() => {
                     sendToPassenger({ type: 'INIT_MAP', map: roomsData });
                     if(currentRoomId) sendToPassenger({ type: 'MOVE_TAXI', roomId: currentRoomId });
@@ -157,13 +176,41 @@
                     if (data.type === 'NEW_ORDER') {
                         handleIncomingOrder(data.idA, data.idB);
                     }
+                    // Ловим текстовые сообщения от пассажира
+                    if (data.type === 'CHAT') {
+                        addMessageToBox('Пассажир', data.text, 'passenger');
+                    }
                 });
 
                 conn.on('close', () => {
                     document.getElementById('netStatus').innerText = "❌ Пассажир отключился";
+                    document.getElementById('chatInput').disabled = true;
+                    document.getElementById('chatSendBtn').disabled = true;
                     stopOrders();
                 });
             });
+        }
+
+        // Логика чата: отправка сообщения
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Шлем пакет типа CHAT пассажиру
+            sendToPassenger({ type: 'CHAT', text: text });
+            
+            // Добавляем себе на экран
+            addMessageToBox('Вы (Водитель)', text, 'driver');
+            input.value = '';
+        }
+
+        function addMessageToBox(sender, text, cssClass) {
+            const msgEl = document.createElement('div');
+            msgEl.className = `chat-msg ${cssClass}`;
+            msgEl.innerHTML = `<strong>${sender}:</strong> ${text}`;
+            chatBox.appendChild(msgEl);
+            chatBox.scrollTop = chatBox.scrollHeight; // Скроллим вниз к новому сообщению
         }
 
         function sendToPassenger(obj) {
@@ -193,11 +240,9 @@
         }
 
         function addNewRoom() {
-            let name = prompt("Название комнаты (например: Кухня):", "Комната");
+            let name = prompt("Название комнаты:", "Комната");
             if (!name) return;
             let id = 'room_' + Date.now();
-            
-            // Создаем прямо по центру видимого поля карты
             let newRoom = { id: id, name: name, left: 50, top: 50, width: 120, height: 100 };
             roomsData.push(newRoom);
             createRoomElement(newRoom);
@@ -208,10 +253,8 @@
             el.className = 'custom-room' + (currentMode === 'edit' ? ' edit-mode' : '');
             el.id = data.id;
             el.innerText = data.name;
-            el.style.left = data.left + 'px'; 
-            el.style.top = data.top + 'px';
-            el.style.width = data.width + 'px'; 
-            el.style.height = data.height + 'px';
+            el.style.left = data.left + 'px'; el.style.top = data.top + 'px';
+            el.style.width = data.width + 'px'; el.style.height = data.height + 'px';
 
             el.onclick = () => {
                 if (currentMode === 'game') {
@@ -224,47 +267,32 @@
             resizer.className = 'resizer';
             el.appendChild(resizer);
 
-            // Полностью исправленный Drag & Drop для мобилок и ПК внутри контейнера карты
             el.onmousedown = el.ontouchstart = function(e) {
                 if (currentMode !== 'edit' || e.target === resizer) return;
                 let event = e.touches ? e.touches[0] : e;
                 let startX = event.clientX - el.offsetLeft;
                 let startY = event.clientY - el.offsetTop;
-
                 document.onmousemove = document.ontouchmove = function(ev) {
                     let moveEvent = ev.touches ? ev.touches[0] : ev;
-                    let nL = moveEvent.clientX - startX; 
-                    let nT = moveEvent.clientY - startY;
-                    
-                    // Ограничиваем рамками карты
-                    if (nL < 0) nL = 0;
-                    if (nT < 0) nT = 0;
+                    let nL = moveEvent.clientX - startX; let nT = moveEvent.clientY - startY;
+                    if (nL < 0) nL = 0; if (nT < 0) nT = 0;
                     if (nL + el.offsetWidth > mapContainer.offsetWidth) nL = mapContainer.offsetWidth - el.offsetWidth;
                     if (nT + el.offsetHeight > mapContainer.offsetHeight) nT = mapContainer.offsetHeight - el.offsetHeight;
-
-                    el.style.left = nL + 'px'; 
-                    el.style.top = nT + 'px';
-                    data.left = nL; 
-                    data.top = nT;
+                    el.style.left = nL + 'px'; el.style.top = nT + 'px';
+                    data.left = nL; data.top = nT;
                 };
                 document.onmouseup = document.ontouchend = function() { document.onmousemove = document.ontouchmove = null; };
             };
 
-            // Ресайзер
             resizer.onmousedown = resizer.ontouchstart = function(e) {
                 if (currentMode !== 'edit') return;
                 e.stopPropagation();
                 let event = e.touches ? e.touches[0] : e;
-                let sW = el.offsetWidth; 
-                let sH = el.offsetHeight;
-                let sX = event.clientX; 
-                let sY = event.clientY;
-
+                let sW = el.offsetWidth; let sH = el.offsetHeight;
+                let sX = event.clientX; let sY = event.clientY;
                 document.onmousemove = document.ontouchmove = function(ev) {
                     let moveEvent = ev.touches ? ev.touches[0] : ev;
-                    let nW = sW + (moveEvent.clientX - sX); 
-                    let nH = sH + (moveEvent.clientY - sY);
-
+                    let nW = sW + (moveEvent.clientX - sX); let nH = sH + (moveEvent.clientY - sY);
                     if (nW > 50 && data.left + nW <= mapContainer.offsetWidth) { el.style.width = nW + 'px'; data.width = nW; }
                     if (nH > 50 && data.top + nH <= mapContainer.offsetHeight) { el.style.height = nH + 'px'; data.height = nH; }
                 };
@@ -375,10 +403,4 @@
 
         window.onload = () => {
             const savedRooms = localStorage.getItem('fixed_taxi_rooms');
-            if (savedRooms) roomsData = JSON.parse(savedRooms);
-            renderMap();
-            initNetwork();
-        };
-    </script>
-</body>
-</html>
+            if (savedRooms) ro
