@@ -28,26 +28,8 @@
             margin-bottom: 10px;
             text-align: center;
         }
-        .net-input {
-            width: 50%;
-            padding: 8px;
-            font-size: 18px;
-            border-radius: 6px;
-            border: none;
-            text-align: center;
-            font-weight: bold;
-        }
-        .connect-btn {
-            background: #1e293b;
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            font-size: 15px;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-left: 5px;
-        }
+        .net-input { width: 50%; padding: 8px; font-size: 18px; border-radius: 6px; border: none; text-align: center; font-weight: bold; }
+        .connect-btn { background: #1e293b; color: white; border: none; padding: 8px 15px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; margin-left: 5px; }
 
         .order-panel {
             width: 100%;
@@ -67,18 +49,29 @@
         .map-container { 
             width: 100%;  
             max-width: 450px;
-            height: 400px; 
+            height: 350px; 
             position: relative; 
             background: #cbd5e1;
             border-radius: 16px;
             border: 3px solid #16a34a;
             overflow: hidden;
+            margin-bottom: 10px;
         }
         
         .passenger-room { position: absolute; background: rgba(255, 255, 255, 0.9); border: 3px solid #16803d; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #14532d; font-size: 14px; text-align: center; pointer-events: none; }
         .passenger-room.highlight-target { border-color: #ef4444; background: rgba(254, 226, 226, 0.9); box-shadow: 0 0 12px #ef4444; }
 
         .taxi-marker { width: 36px; height: 36px; background-color: #f59e0b; border: 3px solid #111827; border-radius: 50%; position: absolute; display: flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); transition: all 0.3s ease-in-out; z-index: 100; display: none; }
+        
+        /* СТИЛИ ЧАТА */
+        .chat-panel { width: 100%; max-width: 450px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 10px; display: flex; flex-direction: column; gap: 5px; }
+        .chat-box { width: 100%; height: 100px; border: 1px solid #e5e7eb; border-radius: 8px; overflow-y: auto; padding: 8px; font-size: 13px; background: #f9fafb; }
+        .chat-msg { margin-bottom: 4px; line-height: 1.4; word-break: break-all; }
+        .chat-msg.driver { color: #1e3a8a; }
+        .chat-msg.passenger { color: #15803d; }
+        .chat-input-row { display: flex; gap: 5px; }
+        .chat-input { flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+        .chat-send-btn { background: #16a34a; color: white; border: none; padding: 8px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -104,6 +97,16 @@
         <div id="taxi" class="taxi-marker">🚖</div>
     </div>
 
+    <div class="chat-panel">
+        <div class="chat-box" id="chatBox">
+            <div style="color:#9ca3af;font-style:italic;text-align:center;">Чат недоступен. Подключитесь к водителю...</div>
+        </div>
+        <div class="chat-input-row">
+            <input type="text" id="chatInput" class="chat-input" placeholder="Написать водителю..." disabled onkeydown="if(event.key==='Enter') sendChatMessage()">
+            <button id="chatSendBtn" class="chat-send-btn" onclick="sendChatMessage()" disabled>Отправить</button>
+        </div>
+    </div>
+
     <script>
         let peer = null;
         let conn = null;
@@ -111,6 +114,7 @@
 
         const mapContainer = document.getElementById('map');
         const taxiMarker = document.getElementById('taxi');
+        const chatBox = document.getElementById('chatBox');
 
         function connectToDriver() {
             const shortId = document.getElementById('driverIdInput').value.trim();
@@ -118,11 +122,11 @@
 
             document.getElementById('connStatus').innerText = "⏳ Подключение к " + shortId + "...";
             
-            if (peer) peer.destroy(); // Сбрасываем старые сессии, если были
+            if (peer) peer.destroy();
             
             peer = new Peer();
             peer.on('open', () => {
-                conn = peer.connect(shortId); // Цепляемся напрямую к 4 цифрам!
+                conn = peer.connect(shortId);
 
                 conn.on('open', () => {
                     document.getElementById('connStatus').innerText = "🟢 Подключено к [" + shortId + "]";
@@ -130,23 +134,25 @@
                     document.getElementById('orderBtn').disabled = false;
                     document.getElementById('selectA').disabled = false;
                     document.getElementById('selectB').disabled = false;
+                    
+                    // Включаем чат
+                    document.getElementById('chatInput').disabled = false;
+                    document.getElementById('chatSendBtn').disabled = false;
+                    chatBox.innerHTML = '<div style="color:#1e3a8a; text-align:center;">Вы подключились к водителю</div>';
                 });
 
                 conn.on('data', (data) => {
-                    if (data.type === 'INIT_MAP') {
-                        mapRooms = data.map;
-                        buildPassengerMap();
-                    }
-                    if (data.type === 'MOVE_TAXI') {
-                        moveTaxiMarker(data.roomId);
-                    }
-                    if (data.type === 'STATUS') {
-                        document.getElementById('statusBox').innerText = data.text;
-                    }
+                    if (data.type === 'INIT_MAP') { mapRooms = data.map; buildPassengerMap(); }
+                    if (data.type === 'MOVE_TAXI') { moveTaxiMarker(data.roomId); }
+                    if (data.type === 'STATUS') { document.getElementById('statusBox').innerText = data.text; }
                     if (data.type === 'HIGHLIGHT') {
                         document.querySelectorAll('.passenger-room').forEach(r => r.classList.remove('highlight-target'));
                         const target = document.getElementById('p_' + data.idB);
                         if(target) target.classList.add('highlight-target');
+                    }
+                    // Ловим текстовые сообщения от водителя
+                    if (data.type === 'CHAT') {
+                        addMessageToBox('Водитель', data.text, 'driver');
                     }
                 });
 
@@ -160,6 +166,30 @@
                 alert("Ошибка! Проверьте, запущен ли таксометр водителя.");
                 document.getElementById('connStatus').innerText = "🔴 Ошибка";
             });
+        }
+
+        // Логика чата: отправка сообщения
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Шлем пакет чата водителю
+            if (conn && conn.open) {
+                conn.send({ type: 'CHAT', text: text });
+            }
+            
+            // Отрисовываем у себя
+            addMessageToBox('Вы (Пассажир)', text, 'passenger');
+            input.value = '';
+        }
+
+        function addMessageToBox(sender, text, cssClass) {
+            const msgEl = document.createElement('div');
+            msgEl.className = `chat-msg ${cssClass}`;
+            msgEl.innerHTML = `<strong>${sender}:</strong> ${text}`;
+            chatBox.appendChild(msgEl);
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         function buildPassengerMap() {
