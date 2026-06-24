@@ -30,14 +30,15 @@
             text-align: center;
         }
         .peer-id-display {
-            font-size: 22px;
+            font-size: 24px;
             font-weight: bold;
             color: #38bdf8;
             background: rgba(255,255,255,0.1);
-            padding: 4px 15px;
+            padding: 6px 20px;
             border-radius: 6px;
             display: inline-block;
             margin-top: 5px;
+            letter-spacing: 2px;
         }
 
         .header-menu { width: 100%; max-width: 450px; display: flex; gap: 10px; margin-bottom: 10px; }
@@ -75,7 +76,6 @@
         .custom-room.edit-mode .resizer { display: block; }
         .custom-room.edit-mode { border-color: #ef4444; background: rgba(254, 226, 226, 0.8); }
         
-        /* СТИЛИ ЧАТА */
         .chat-panel { width: 100%; max-width: 450px; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); padding: 10px; display: flex; flex-direction: column; gap: 5px; }
         .chat-box { width: 100%; height: 100px; border: 1px solid #e5e7eb; border-radius: 8px; overflow-y: auto; padding: 8px; font-size: 13px; background: #f9fafb; }
         .chat-msg { margin-bottom: 4px; line-height: 1.4; word-break: break-all; }
@@ -139,17 +139,22 @@
         let peer = null;
         let conn = null;
 
+        // Наш скрытый префикс для обхода блокировки сервера PeerJS
+        const ID_PREFIX = "danil-taxi-id-";
+
         const mapContainer = document.getElementById('map');
         const taxiMarker = document.getElementById('taxi');
         const chatBox = document.getElementById('chatBox');
 
         function initNetwork() {
             const shortId = Math.floor(1000 + Math.random() * 9000).toString();
-            peer = new Peer(shortId);
+            
+            // Сервер увидит текстовый ID, например: "danil-taxi-id-4729" и разрешит его!
+            peer = new Peer(ID_PREFIX + shortId);
 
             peer.on('open', (id) => {
                 document.getElementById('netStatus').innerText = "🟢 В сети. Код для пассажира:";
-                document.getElementById('peerIdDisplay').innerText = id;
+                document.getElementById('peerIdDisplay').innerText = shortId; // На экран выводим ТОЛЬКО 4 цифры
             });
 
             peer.on('error', (err) => {
@@ -162,7 +167,6 @@
                 document.getElementById('netStatus').innerText = "🤝 Пассажир подключен!";
                 document.getElementById('statusText').innerText = "Свободен. Ожидание заказа...";
                 
-                // Включаем интерфейс чата
                 document.getElementById('chatInput').disabled = false;
                 document.getElementById('chatSendBtn').disabled = false;
                 chatBox.innerHTML = '<div style="color:#15803d; text-align:center;">Пассажир вошел в чат</div>';
@@ -173,13 +177,8 @@
                 }, 500);
 
                 conn.on('data', (data) => {
-                    if (data.type === 'NEW_ORDER') {
-                        handleIncomingOrder(data.idA, data.idB);
-                    }
-                    // Ловим текстовые сообщения от пассажира
-                    if (data.type === 'CHAT') {
-                        addMessageToBox('Пассажир', data.text, 'passenger');
-                    }
+                    if (data.type === 'NEW_ORDER') { handleIncomingOrder(data.idA, data.idB); }
+                    if (data.type === 'CHAT') { addMessageToBox('Пассажир', data.text, 'passenger'); }
                 });
 
                 conn.on('close', () => {
@@ -191,16 +190,11 @@
             });
         }
 
-        // Логика чата: отправка сообщения
         function sendChatMessage() {
             const input = document.getElementById('chatInput');
             const text = input.value.trim();
             if (!text) return;
-
-            // Шлем пакет типа CHAT пассажиру
             sendToPassenger({ type: 'CHAT', text: text });
-            
-            // Добавляем себе на экран
             addMessageToBox('Вы (Водитель)', text, 'driver');
             input.value = '';
         }
@@ -210,7 +204,7 @@
             msgEl.className = `chat-msg ${cssClass}`;
             msgEl.innerHTML = `<strong>${sender}:</strong> ${text}`;
             chatBox.appendChild(msgEl);
-            chatBox.scrollTop = chatBox.scrollHeight; // Скроллим вниз к новому сообщению
+            chatBox.scrollTop = chatBox.scrollHeight;
         }
 
         function sendToPassenger(obj) {
@@ -378,29 +372,5 @@
                     return;
                 }
                 clearMapHighlights();
-                document.getElementById(activePointB.id).classList.add('target-dropoff');
-                statusText.innerText = `Пассажир в пути до: ${activePointB.name}`;
-                statusText.style.color = "#f59e0b";
-                btn.innerText = "Завершить поездку";
-                currentStep = 3;
-                sendToPassenger({ type: 'STATUS', text: 'Вы в такси. В пути...' });
-                sendToPassenger({ type: 'HIGHLIGHT', idB: activePointB.id });
-            } 
-            else if (currentStep === 3) {
-                if (currentRoomId !== activePointB.id) {
-                    showError(`Вы не доехали до точки "${activePointB.name}"!`);
-                    return;
-                }
-                clearMapHighlights();
-                statusText.innerText = `Поездка завершена! +150 грн.`;
-                statusText.style.color = "#059669";
-                btn.innerText = "Ожидание новых заказов...";
-                btn.disabled = true;
-                sendToPassenger({ type: 'STATUS', text: 'Ура! Вы приехали. Спасибо за поездку!' });
-                activePointA = null; activePointB = null; currentStep = 0;
-            }
-        }
-
-        window.onload = () => {
-            const savedRooms = localStorage.getItem('fixed_taxi_rooms');
-            if (savedRooms) ro
+                document.getElementById(activePoint
+            
