@@ -126,7 +126,12 @@
             
             peer = new Peer();
             peer.on('open', () => {
-                conn = peer.connect(shortId);
+                // Было так:
+//conn = peer.connect(shortId);
+
+// Замени на вот так:
+conn = peer.connect("danil-taxi-id-" + shortId);
+                
 
                 conn.on('open', () => {
                     document.getElementById('connStatus').innerText = "🟢 Подключено к [" + shortId + "]";
